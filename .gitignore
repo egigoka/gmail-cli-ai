@@ -1,6 +1,11 @@
 # keys
 secrets.py
 client_secret_*
+token.pickle
+
+# private data
+useful_emails.json
+emails_by_sender.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
