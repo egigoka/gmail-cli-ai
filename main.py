@@ -1,4 +1,5 @@
 import os
+import sys
 import termcolor
 import uuid
 
@@ -19,8 +20,42 @@ useful_emails = JsonList("useful_emails.json")
 newline = "\n"
 
 if __name__ == '__main__':
-    max_results = 160 + len(useful_emails)
 
+    # args
+    gpt3 = "gpt3" in sys.argv
+    gpt4 = "gpt4" in sys.argv
+    models = "models" in sys.argv
+
+    max_results = 0
+    for arg in sys.argv:
+        if arg.startswith("max="):
+            max_results = int(arg.split("=")[1])
+
+    args_errors = []
+    if not gpt3 and not gpt4 and not models:
+        args_errors.append("Preffered model isn't chosen. "
+                           "Add argument gpt3 or gpt4")
+    if max_results == 0 and not models:
+        args_errors.append("Count of mails to process isn't chosen."
+                           "Add argument max=<count>")
+    if args_errors:
+        print(f"Usage: {sys.argv[0]} gpt3|gpt4|models max=<emails to process>")
+        print(newline.join(args_errors))
+        exit(1)
+
+    # openai auth
+    client = openai_authenticate(OPENAI_API_KEY)
+
+    available_models = client.models
+
+    if models:
+        print(f"Available models:")
+        
+        for model in available_models.list():
+            print(f"Model: {model}")
+        exit(0)
+
+    # gmail auth
     gmail_auth = gmail_authenticate(GMAIL_SECRETS_FILE, SCOPES)
 
     messages = list_emails(gmail_auth, max_results=max_results)
@@ -32,19 +67,17 @@ if __name__ == '__main__':
         os.remove("useful_emails.json")
         exit(0)
 
-    client = openai_authenticate(OPENAI_API_KEY)
-
-    available_models = client.models
-
-    # print(f"Available models:")
-
-    # for model in available_models.list():
-    #     print(f"Model: {model}")
-
-    models_prioritized = [{"id": "gpt-3.5-turbo-16k", "tokens": 16000},
-                          {"id": "gpt-3.5-turbo-instruct", "tokens": 4000},
-                          {"id": "gpt-3.5-turbo", "tokens": 4000}]
-
+    if gpt3:
+        models_prioritized = [{"id": "gpt-3.5-turbo-16k", "tokens": 16385},
+                              {"id": "gpt-3.5-turbo-instruct", "tokens": 4096},
+                              {"id": "gpt-3.5-turbo", "tokens": 16385}]
+        model_name = "GPT-3"
+    elif gpt4:
+        models_prioritized = [{"id": "gpt-4-1106-preview", "tokens": 128000},
+                              {"id": "gpt-4", "tokens": 8192},
+                              {"id": "gpt-4-vision-preview", "tokens": 128000}]
+        model_name = "GPT-4"
+    
     using_model = None
     tokens_count = None
     for prioritized_model in models_prioritized:
@@ -58,6 +91,9 @@ if __name__ == '__main__':
                 break
         if found:
             break
+        else:
+            model_name = prioritized_model["id"]
+            termcolor.cprint("CANNOT FIND MODEL {model_name}", "red")
     if using_model is None:
         print(f"Could not find prioritized model: {models_prioritized}")
         exit(1)
@@ -127,20 +163,24 @@ if __name__ == '__main__':
             assessment = assessments.choices[0].message.content.strip()
 
             if assessment.lower() == "useful":
-                print("GPT-3 Assessment of Email Usefulness:", assessment)
+                print(f"{model_name} Assessment of Email Usefulness:", assessment)
                 termcolor.cprint("Marking email as useful", "green")
                 mark_email_as_useful(useful_emails, email_id)
             elif assessment.lower() == "archive":
-                print("GPT-3 Assessment of Email Usefulness:", assessment)
+                print(f"{model_name} Assessment of Email Usefulness:", assessment)
                 termcolor.cprint("Archiving email", "magenta")
                 archive_email(gmail_auth, 'me', email_id)
             elif assessment.lower() == "unsubscribe":
-                print("GPT-3 Assessment of Email Usefulness:", assessment)
+                print(f"{model_name} Assessment of Email Usefulness:", assessment)
                 unsubscribe_from_emails[email_id] = {"subject": subject_formatted,
                                                      "from": from_formatted}
             elif assessment.lower().startswith("assess label"):
-                print("GPT-3 Assessment of Email Usefulness:", assessment)
+                print(f"{model_name} Assessment of Email Usefulness:", assessment)
                 label_name = " ".join(assessment.split(" ")[2:])
+                if label_name.startswith("["):
+                    label_name = label_name[1:]
+                if label_name.endswith("]"):
+                    label_name = label_name[:-1]
                 try:
                     label_id = labels[label_name.lower()]
                     termcolor.cprint(f"Adding label {label_name} to email", "yellow")
@@ -153,8 +193,8 @@ if __name__ == '__main__':
                                               "from": from_formatted,
                                               "error": error}
             else:
-                print("GPT-3 Assessment of Email Usefulness:", assessment)
-                error = "GPT-3 Assessment of Email Usefulness is not recognized"
+                print(f"{model_name} Assessment of Email Usefulness:", assessment)
+                error = f"{model_name} Assessment of Email Usefulness is not recognized"
                 termcolor.cprint(error, "red")
                 error_emails[email_id] = {"subject": subject_formatted,
                                           "from": from_formatted,

@@ -47,6 +47,7 @@ ONLY use answers from list above.
 DO NOT start with "The email should be..."
 ONLY use answers from list above.
 DO NOT add brackets around the label name.
+DO NOT add square brackets around the label name!
 ONLY use labels that in list above.
 DO NOT use multiple labels.
 ONLY use single label from list above.
