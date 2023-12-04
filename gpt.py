@@ -1,6 +1,7 @@
 from datetime import datetime
+import time
 
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 
 from gmail import get_equal_substrings_from_begging_center_end
 
@@ -9,12 +10,24 @@ def openai_authenticate(openai_api_key):
     return OpenAI(api_key=openai_api_key)
 
 
-def get_messages_gpt(openai_client, model, messages, max_tokens):
-    response = openai_client.chat.completions.create(
-        model=model,
-        messages=messages,
-        max_tokens=max_tokens
-    )
+def get_messages_gpt(openai_client, model, messages, max_tokens, max_retries=10, retry=1):
+    try:
+        response = openai_client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=max_tokens
+        )
+    except RateLimitError:
+        if retry > max_retries:
+            raise
+        print(f"RateLimitError, retrying in {pow(2, retry)} seconds")
+        time.sleep(pow(2, retry))
+        response = get_messages_gpt(openai_client=openai_client,
+                                model=model,
+                                messages=messages,
+                                max_tokens=max_tokens,
+                                max_retries=max_retries,
+                                retry=retry + 1)
 
     return response
 
