@@ -5,6 +5,13 @@ import base64
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from google.auth.exceptions import RefreshError
+
+def authenticate(gmail_secrets_file, scopes):
+    flow = InstalledAppFlow.from_client_secrets_file(
+        gmail_secrets_file, scopes)
+    creds = flow.run_local_server(port=0)
+    return creds
 
 
 def gmail_authenticate(gmail_secrets_file, scopes):
@@ -17,11 +24,12 @@ def gmail_authenticate(gmail_secrets_file, scopes):
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            try:
+                creds.refresh(Request())
+            except RefreshError:
+                creds = authenticate(gmail_secrets_file, scopes)
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                gmail_secrets_file, scopes)
-            creds = flow.run_local_server(port=0)
+            creds = authenticate(gmail_secrets_file, scopes)
         # Save the credentials for the next run
         with open('token.pickle', 'wb') as token:
             pickle.dump(creds, token)
