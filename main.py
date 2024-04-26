@@ -9,7 +9,7 @@ from commands import JsonList
 
 from secrets import OPENAI_API_KEY, GMAIL_SECRETS_FILE
 
-from gpt import openai_authenticate, compose_gpt_message, get_messages_gpt
+from gpt import openai_authenticate, compose_gpt_message, get_messages_gpt, TooManyTokensError
 from gmail import gmail_authenticate, list_emails, get_email, get_email_headers, get_email_body, archive_email, \
     add_label_to_email, get_email_attachments_metadata, mark_email_as_useful, get_labels
 
@@ -158,6 +158,14 @@ if __name__ == '__main__':
                     if i == retries:
                         raise
                     token_multiplier -= 0.2
+                    messages = compose_gpt_message(tokens_count, token_multiplier, all_info)
+                except TooManyTokensError as e:
+                    if i == retries:
+                        raise
+                    tokens_count_new = e.tokens_count_new
+                    requested_tokens = e.requested_tokens
+                    tokens_count = tokens_count_new
+                    token_multiplier -= 0.1
                     messages = compose_gpt_message(tokens_count, token_multiplier, all_info)
 
             assessment = assessments.choices[0].message.content.strip()

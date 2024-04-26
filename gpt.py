@@ -5,6 +5,14 @@ from openai import OpenAI, RateLimitError
 
 from gmail import get_equal_substrings_from_begging_center_end
 
+from commands import dirify, Str
+
+
+class TooManyTokensError(Exception):
+    def __init__(self, tokens_count_new, requested_tokens):
+        self.tokens_count_new = tokens_count_new
+        self.requested_tokens = requested_tokens
+
 
 def openai_authenticate(openai_api_key):
     return OpenAI(api_key=openai_api_key)
@@ -17,17 +25,23 @@ def get_messages_gpt(openai_client, model, messages, max_tokens, max_retries=10,
             messages=messages,
             max_tokens=max_tokens
         )
-    except RateLimitError:
+    except RateLimitError as e:
         if retry > max_retries:
             raise
-        print(f"RateLimitError, retrying in {pow(2, retry)} seconds")
+        response_json = e.response.json()
+        if response_json['error']['type'] == 'tokens':
+            tokens_count_new = Str.substring(response_json['error']['message'], ' on tokens per min (TPM): Limit ')
+            tokens_count_new = Str.get_integers(tokens_count_new)[0]
+            requested_tokens = Str.substring(response_json['error']['message'], 'Requested ')
+            requested_tokens = Str.get_integers(requested_tokens)[0]
+            raise TooManyTokensError(tokens_count_new=tokens_count_new, requested_tokens=requested_tokens)
         time.sleep(pow(2, retry))
         response = get_messages_gpt(openai_client=openai_client,
-                                model=model,
-                                messages=messages,
-                                max_tokens=max_tokens,
-                                max_retries=max_retries,
-                                retry=retry + 1)
+                                    model=model,
+                                    messages=messages,
+                                    max_tokens=max_tokens,
+                                    max_retries=max_retries,
+                                    retry=retry + 1)
 
     return response
 
@@ -62,6 +76,7 @@ ONLY use answers from list above.
 DO NOT add brackets around the label name.
 DO NOT add square brackets around the label name!
 ONLY use labels that in list above.
+When you're using a label, START MESSAGE WITH "assess label".
 DO NOT use multiple labels.
 ONLY use single label from list above.
 DO NOT summarize the email.
