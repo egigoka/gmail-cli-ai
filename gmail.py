@@ -7,6 +7,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.exceptions import RefreshError
 
+
 def authenticate(gmail_secrets_file, scopes):
     flow = InstalledAppFlow.from_client_secrets_file(
         gmail_secrets_file, scopes)

@@ -26,18 +26,12 @@ if __name__ == '__main__':
     gpt4 = "gpt4" in sys.argv
     models = "models" in sys.argv
 
-    max_results = 0
-    for arg in sys.argv:
-        if arg.startswith("max="):
-            max_results = int(arg.split("=")[1])
+    max_results = 100
 
     args_errors = []
     if not gpt3 and not gpt4 and not models:
-        args_errors.append("Preffered model isn't chosen. "
+        args_errors.append("Preferred model isn't chosen. "
                            "Add argument gpt3 or gpt4")
-    if max_results == 0 and not models:
-        args_errors.append("Count of mails to process isn't chosen."
-                           "Add argument max=<count>")
     if args_errors:
         print(f"Usage: {sys.argv[0]} gpt3|gpt4|models max=<emails to process>")
         print(newline.join(args_errors))
@@ -67,6 +61,8 @@ if __name__ == '__main__':
         os.remove("useful_emails.json")
         exit(0)
 
+    models_prioritized = []
+    model_name = None
     if gpt3:
         models_prioritized = [{"id": "gpt-3.5-turbo-16k", "tokens": 16385},
                               {"id": "gpt-3.5-turbo-instruct", "tokens": 4096},
@@ -207,7 +203,7 @@ if __name__ == '__main__':
                 error_emails[email_id] = {"subject": subject_formatted,
                                           "from": from_formatted,
                                           "error": error}
-        except:
+        except Exception:
             error_emails[f"unknown {str(uuid.uuid4())}"] = {"subject": "unknown",
                                                             "from": "unknown",
                                                             "error": "Error processing email"}
