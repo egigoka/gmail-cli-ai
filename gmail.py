@@ -2,7 +2,12 @@ import os
 import pickle
 import base64
 
-from google.auth.transport.requests import Request
+try:
+    from google.auth.transport.requests import Request
+except ModuleNotFoundError:
+    print("install google-api-python-client")
+    exit(1)
+
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
