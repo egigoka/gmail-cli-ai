@@ -7,6 +7,9 @@ token.pickle
 useful_emails.json
 emails_by_sender.json
 
+# intellij
+.idea/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

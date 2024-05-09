@@ -1,4 +1,3 @@
-import os
 import shutil
 import sys
 import termcolor
@@ -81,7 +80,7 @@ if __name__ == '__main__':
                                                         "email_id": email_id,
                                                         "attachments": get_email_attachments_metadata(email)}]
 
-            except:
+            except Exception:
                 raise
 
         # remove emails with only one email
@@ -126,12 +125,17 @@ if __name__ == '__main__':
             labels = get_labels(gmail_auth, 'me')
             len_str_emails = len(str(len_emails))
             action = "Archiving" if answer == 1 else "Labeling" if answer == 2 else "Marking as spam"
+            label = None
             if answer == 2:
                 enumerated_labels = list(enumerate(labels))
                 for cnt_label, label in enumerated_labels:
                     print(f"{cnt_label} {label['id']}: {label['name']}")
                 label_cnt = CLI.get_int("Label ID:")
                 label = enumerated_labels[label_cnt]
+                # debug
+                from commands import Print
+                Print.prettify(label)
+                # debug END
                 if not CLI.get_y_n(f"Label {label['name']}?"):
                     break
             for cnt_email, email in enumerate(emails):
@@ -144,6 +148,10 @@ if __name__ == '__main__':
 
                 email_id = email["email_id"]
                 if answer == 2:
+                    # debug
+                    from commands import Print
+                    Print.prettify(label)
+                    # debug END
                     add_label_to_email(gmail_auth, 'me', email_id, label['id'])
                 elif answer == 3:
                     mark_as_spam(gmail_auth, 'me', email_id)
