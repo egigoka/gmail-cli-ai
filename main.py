@@ -69,7 +69,7 @@ if __name__ == '__main__':
                               {"id": "gpt-3.5-turbo", "tokens": 16385}]
         model_name = "GPT-3"
     elif gpt4:
-        models_prioritized = [{"id": "gpt-4o", "tokens": 128000}
+        models_prioritized = [{"id": "gpt-4o", "tokens": 128000},
                               {"id": "gpt-4-turbo", "tokens": 128000},
                               {"id": "gpt-4", "tokens": 8192},
                               {"id": "gpt-4-vision-preview", "tokens": 128000}]
