@@ -12,12 +12,53 @@ from gmail import gmail_authenticate, list_emails, get_email, get_email_headers,
 # If modifying these SCOPES, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 
+accounts = JsonDict("accounts.json")
+
+auths = {}  # address: auth
+
 newline = "\n"
 
 clean = "clean" in sys.argv or "-c" in sys.argv or "--clean" in sys.argv \
         or "clear" in sys.argv or "--clear" in sys.argv
 
+def print_accounts():
+    for account_, _ in accounts.items():
+        print(account_)
+    
+
 if __name__ == '__main__':
+
+    while True:
+        print("Available accounts:")
+        print_accounts()
+
+        print()
+
+        print("Actions: ")
+        print("1 - add account")
+        print("2 - remove account")
+        print("c - continue")
+        
+        print()
+
+        action = input("Action: ")
+        if action == "c":
+            break
+        elif action == "1":
+            account_name = input("Account name: ")
+            token_file = input("Token file: ")
+            accounts[account_name] = token_file
+            accounts.save()
+        elif action == "2":
+            account_name = input("Account name: ")
+            try:
+                accounts.pop(account_name)
+            except KeyError:
+                print("Incorrect account name.")
+        else:
+            print("Incorrect command")
+        print()
+
     print("Getting emails...", end="\r")
     emails_by_sender = JsonDict("emails_by_sender.json")
 
@@ -29,63 +70,75 @@ if __name__ == '__main__':
 
     max_results = 500
 
-    gmail_auth = gmail_authenticate(GMAIL_SECRETS_FILE, SCOPES)
+    for account_name, token_file in accounts.items():
+        print()
+        print(f"Authenticating {account_name}...")
+        auths[account_name] = gmail_authenticate(GMAIL_SECRETS_FILE, SCOPES, token_file)
 
     console_width = shutil.get_terminal_size().columns - 1
 
+    for account, gmail_auth in auths.items():
+        auths[account] = gmail_authenticate(GMAIL_SECRETS_FILE, SCOPES, account)
+
     if clean:
-        messages = list_emails(gmail_auth, max_results=max_results)
+        accounts_len = len(auths)
+        account_cnt = 0
+        for account_name, gmail_auth in auths.items():
+            account_cnt += 1
+            messages = list_emails(gmail_auth, max_results=max_results)
 
-        len_messages = len(messages)
+            len_messages = len(messages)
 
-        for cnt, msg in enumerate(messages):
-            try:
-                email_id = msg['id']
-
-                cnt_str = f"[{str((cnt + 1)).zfill(len(str(len_messages)))} / {len_messages}]"
-
-                email = get_email(gmail_auth, 'me', email_id)
-
-                headers = get_email_headers(email)
+            for cnt, msg in enumerate(messages):
                 try:
-                    subject = headers['Subject']
-                except KeyError:
-                    subject = headers['subject']
-                subject_formatted = f"Subject: {subject}"
+                    email_id = msg['id']
 
-                try:
-                    from_ = headers['From']
-                except KeyError:
-                    from_ = headers['from']
-                from_formatted = f"From: {from_}"
+                    cnt_str = f"[{account_cnt}/{accounts_len}] [{str((cnt + 1)).zfill(len(str(len_messages)))} / {len_messages}]"
 
-                try:
-                    from_as_email = from_.split("<")[1].split(">")[0]
-                except IndexError:
-                    from_as_email = from_.split(">")[0]
+                    email = get_email(gmail_auth, 'me', email_id)
 
-                info_formatted = f"{from_formatted} {subject_formatted}"
+                    headers = get_email_headers(email)
+                    try:
+                        subject = headers['Subject']
+                    except KeyError:
+                        subject = headers['subject']
+                    subject_formatted = f"Subject: {subject}"
 
-                message = f"Getting info {cnt_str} {info_formatted}"
-                message = message[:console_width - 1]
-                print(" " * console_width, end="\r")
-                print(message, end="\r")
+                    try:
+                        from_ = headers['From']
+                    except KeyError:
+                        from_ = headers['from']
+                    from_formatted = f"From: {from_}"
 
-                try:
-                    emails_by_sender[from_as_email].append({"subject": subject,
+                    try:
+                        from_as_email = from_.split("<")[1].split(">")[0]
+                    except IndexError:
+                        from_as_email = from_.split(">")[0]
+
+                    info_formatted = f"{account_name} {from_formatted} {subject_formatted}"
+
+                    message = f"Getting info {cnt_str} {info_formatted}"
+                    message = message[:console_width - 1]
+                    print(" " * console_width, end="\r")
+                    print(message, end="\r")
+
+                    try:
+                        emails_by_sender[from_as_email].append({"subject": subject,
+                                                                "email_id": email_id,
+                                                                "attachments": get_email_attachments_metadata(email),
+                                                                "account": account_name})
+                    except KeyError:
+                        emails_by_sender[from_as_email] = [{"subject": subject,
                                                             "email_id": email_id,
-                                                            "attachments": get_email_attachments_metadata(email)})
-                except KeyError:
-                    emails_by_sender[from_as_email] = [{"subject": subject,
-                                                        "email_id": email_id,
-                                                        "attachments": get_email_attachments_metadata(email)}]
+                                                            "attachments": get_email_attachments_metadata(email),
+                                                            "account": account_name}]
 
-            except Exception:
-                raise
+                except Exception:
+                    raise
 
         # remove emails with only one email
-        emails_by_sender.string = {k: v for k, v in emails_by_sender.items() if len(v) > 1}
-        emails_by_sender.save()
+        # emails_by_sender.string = {k: v for k, v in emails_by_sender.items() if len(v) > 1}
+        # emails_by_sender.save()
 
     # sort by number of emails
     emails_by_sender_sorted = {k: v for k, v in
@@ -116,29 +169,16 @@ if __name__ == '__main__':
         while True:
             answer = CLI.get_int("What to do? \n"
                                  "1) Archive, \n"
-                                 "2) Label, \n"
-                                 "3) Mark as spam, \n"
-                                 "4) Nothing:")
-            if answer in [1, 2, 3, 4]:
+                                 "2) Mark as spam, \n"
+                                 "3) Nothing:")
+            if answer in [1, 2, 3]:
                 break
-        if answer in [1, 2, 3]:
-            labels = get_labels(gmail_auth, 'me')
+        if answer in [1, 2]:
             len_str_emails = len(str(len_emails))
-            action = "Archiving" if answer == 1 else "Labeling" if answer == 2 else "Marking as spam"
+            action = "Archiving" if answer == 1 else "Marking as spam"
             label = None
-            if answer == 2:
-                enumerated_labels = list(enumerate(labels))
-                for cnt_label, label in enumerated_labels:
-                    print(f"{cnt_label} {label['id']}: {label['name']}")
-                label_cnt = CLI.get_int("Label ID:")
-                label = enumerated_labels[label_cnt]
-                # debug
-                from commands import Print
-                Print.prettify(label)
-                # debug END
-                if not CLI.get_y_n(f"Label {label['name']}?"):
-                    break
             for cnt_email, email in enumerate(emails):
+                gmail_auth = auths[email["account"]]
 
                 console_width = shutil.get_terminal_size().columns - 1
                 message = f"{action} [{str(cnt_email).zfill(len_str_emails)}/{len_emails}] {email['subject']}"
@@ -148,13 +188,10 @@ if __name__ == '__main__':
 
                 email_id = email["email_id"]
                 if answer == 2:
-                    # debug
-                    from commands import Print
-                    Print.prettify(label)
-                    # debug END
-                    add_label_to_email(gmail_auth, 'me', email_id, label['id'])
-                elif answer == 3:
                     mark_as_spam(gmail_auth, 'me', email_id)
                 archive_email(gmail_auth, 'me', email_id)
         emails_by_sender.pop(sender)
         emails_by_sender.save()
+
+    emails_by_sender.clear()
+    emails_by_sender.save()
