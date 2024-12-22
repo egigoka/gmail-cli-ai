@@ -20,12 +20,13 @@ def authenticate(gmail_secrets_file, scopes):
     return creds
 
 
-def gmail_authenticate(gmail_secrets_file, scopes):
+def gmail_authenticate(gmail_secrets_file, scopes, token_file):
     creds = None
+    token_file = token_file + ".pickle"
     # The file token.pickle stores the user's access and refresh tokens, and is
     # created automatically when the authorization flow completes for the first time.
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
+    if os.path.exists(token_file):
+        with open(token_file, 'rb') as token:
             creds = pickle.load(token)
     # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
@@ -37,7 +38,7 @@ def gmail_authenticate(gmail_secrets_file, scopes):
         else:
             creds = authenticate(gmail_secrets_file, scopes)
         # Save the credentials for the next run
-        with open('token.pickle', 'wb') as token:
+        with open(token_file, 'wb') as token:
             pickle.dump(creds, token)
 
     return build('gmail', 'v1', credentials=creds)
