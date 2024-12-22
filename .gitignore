@@ -1,7 +1,8 @@
 # keys
 secrets.py
 client_secret_*
-token.pickle
+*.pickle
+accounts.json
 
 # private data
 useful_emails.json
